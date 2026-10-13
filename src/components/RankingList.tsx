@@ -32,9 +32,9 @@ export function RankingList({ entries, selfId, limit }: { entries: RankingEntry[
                 {e.name}
               </Link>
               {e.dateId ? (
-                <Link href={`/dates/${e.dateId}`} className="chip chip-emerald hover:brightness-125">transcript</Link>
+                <Link href={`/dates/${e.dateId}`} className="shrink-0 text-[11px] text-emerald-300 hover:underline">transcript</Link>
               ) : (
-                <Link href={`/date/live?a=${selfId}&b=${e.personId}`} className="chip chip-rose hover:brightness-125">send on a date</Link>
+                <Link href={`/date/live?a=${selfId}&b=${e.personId}`} className="shrink-0 text-[11px] text-rose-300 hover:underline">date</Link>
               )}
             </div>
             <div className="truncate text-xs text-zinc-500">{e.headline}</div>

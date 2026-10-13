@@ -8,21 +8,27 @@ import { DatePicker } from "@/components/DatePicker";
 
 export const dynamic = "force-dynamic";
 
-function Section({ title, items, tone, icon }: { title: string; items: string[]; tone: string; icon: string }) {
+function FindCard({
+  title,
+  items,
+  accent,
+}: {
+  title: string;
+  items: string[];
+  accent: string;
+}) {
   if (!items?.length) return null;
   return (
-    <div>
-      <h3 className="label flex items-center gap-1.5">
-        <span className="text-sm leading-none">{icon}</span> {title}
-      </h3>
-      <div className="flex flex-wrap gap-1.5">
+    <article className="min-w-0 rounded-2xl border border-white/8 bg-white/[0.035] p-4">
+      <h3 className="label !mb-3">{title}</h3>
+      <ul className="space-y-2.5">
         {items.map((x, i) => (
-          <span key={i} className={`chip ${tone} !leading-snug`}>
+          <li key={i} className={`border-l-2 pl-3 text-[13px] leading-relaxed text-zinc-200 ${accent}`}>
             {x}
-          </span>
+          </li>
         ))}
-      </div>
-    </div>
+      </ul>
+    </article>
   );
 }
 
@@ -40,7 +46,6 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <section className="card fade-up relative overflow-hidden p-6 sm:p-8">
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gradient-to-br from-rose-500/25 to-orange-400/10 blur-3xl" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -65,84 +70,114 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             </div>
             <p className="mt-5 max-w-3xl text-[15px] leading-relaxed text-zinc-300">{a.summary}</p>
           </div>
-          <div className="w-full shrink-0 lg:w-64">
+          <div className="w-full shrink-0 lg:w-72">
             <DatePicker selfId={person.id} options={people.filter((p) => p.id !== person.id).map((p) => ({ id: p.id, name: p.name }))} />
           </div>
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
-        {/* Analysis */}
-        <div className="space-y-6">
-          <section className="card fade-up delay-1 space-y-6 p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold tracking-tight">What the agent found</h2>
-              <span className="chip chip-zinc">LinkedIn + Instagram only</span>
-            </div>
-            <Section icon="◆" title="Needs" items={a.needs} tone="chip-rose" />
-            <Section icon="◆" title="Hobbies" items={a.hobbies} tone="chip-orange" />
-            <Section icon="◆" title="Interests" items={a.interests} tone="chip-amber" />
-            <Section icon="◆" title="Values" items={a.values} tone="chip-emerald" />
-            <Section icon="◆" title="Personality" items={a.personality} tone="chip-sky" />
-            <Section icon="◆" title="Dealbreakers" items={a.dealbreakers} tone="chip-zinc" />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
-                <h3 className="label">Dating style</h3>
-                <p className="text-sm leading-relaxed text-zinc-300">{a.datingStyle}</p>
-              </div>
-              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
-                <h3 className="label">Ideal partner</h3>
-                <p className="text-sm leading-relaxed text-zinc-300">{a.idealPartner}</p>
-              </div>
-            </div>
-            <Section icon="◆" title="Good things to bring up" items={a.conversationStarters} tone="chip-violet" />
-          </section>
+      <section className="card fade-up delay-1 p-6 sm:p-7">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-display text-2xl font-medium tracking-tight">What the agent found</h2>
+            <p className="mt-1 text-sm text-zinc-500">Read from the two public sources only — LinkedIn and Instagram.</p>
+          </div>
+          <span className="chip chip-zinc">LinkedIn + Instagram</span>
+        </div>
 
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <FindCard title="Needs" items={a.needs} accent="border-rose-400/50" />
+          <FindCard title="Hobbies" items={a.hobbies} accent="border-orange-400/50" />
+          <FindCard title="Interests" items={a.interests} accent="border-amber-400/50" />
+          <FindCard title="Values" items={a.values} accent="border-emerald-400/50" />
+          <FindCard title="Personality" items={a.personality} accent="border-sky-400/50" />
+          <FindCard title="Dealbreakers" items={a.dealbreakers} accent="border-zinc-500/60" />
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <article className="rounded-2xl border border-white/8 bg-white/[0.035] p-5">
+            <h3 className="label">Dating style</h3>
+            <p className="text-sm leading-relaxed text-zinc-200">{a.datingStyle}</p>
+          </article>
+          <article className="rounded-2xl border border-white/8 bg-white/[0.035] p-5">
+            <h3 className="label">Ideal partner</h3>
+            <p className="text-sm leading-relaxed text-zinc-200">{a.idealPartner}</p>
+          </article>
+        </div>
+
+        {a.conversationStarters.length > 0 && (
+          <article className="mt-3 rounded-2xl border border-violet-400/15 bg-violet-500/[0.06] p-5">
+            <h3 className="label !text-violet-300/80">Good things to bring up</h3>
+            <ol className="grid gap-2 sm:grid-cols-2">
+              {a.conversationStarters.map((x, i) => (
+                <li key={i} className="flex gap-3 text-sm leading-relaxed text-zinc-200">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-400/20 text-[11px] font-semibold text-violet-200">
+                    {i + 1}
+                  </span>
+                  <span>{x}</span>
+                </li>
+              ))}
+            </ol>
+          </article>
+        )}
+      </section>
+
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)]">
+        <div className="min-w-0 space-y-6">
           <section className="card fade-up delay-2 p-6">
-            <h2 className="text-lg font-semibold tracking-tight">Evidence</h2>
+            <h2 className="font-display text-xl font-medium tracking-tight">Evidence</h2>
             <p className="mt-1 text-xs text-zinc-500">Where each conclusion came from.</p>
             <ul className="mt-4 space-y-2.5">
               {a.evidence.map((e, i) => (
                 <li key={i} className="rounded-xl border border-white/5 bg-white/[0.03] p-3.5 text-sm">
                   <div className="flex items-start gap-2">
                     <span className={`chip shrink-0 ${e.source === "instagram" ? "chip-fuchsia" : e.source === "both" ? "chip-violet" : "chip-sky"}`}>{e.source}</span>
-                    <span className="italic text-zinc-400">“{e.quote}”</span>
+                    <span className="min-w-0 italic text-zinc-400">“{e.quote}”</span>
                   </div>
-                  <div className="mt-2 flex gap-2 text-zinc-200"><span className="text-rose-400">→</span>{e.inference}</div>
+                  <div className="mt-2 flex gap-2 text-zinc-200">
+                    <span className="text-rose-400">→</span>
+                    <span>{e.inference}</span>
+                  </div>
                 </li>
               ))}
             </ul>
           </section>
 
           <section className="card fade-up delay-2 relative overflow-hidden p-6">
-            <div className="pointer-events-none absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-violet-500/15 blur-3xl" />
-            <h2 className="text-lg font-semibold tracking-tight">The agent&apos;s voice</h2>
-            <p className="mt-1 text-xs text-zinc-500">How the agent speaks and behaves when it dates on {first}&apos;s behalf.</p>
+            <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-violet-500/15 blur-3xl" />
+            <h2 className="font-display text-xl font-medium tracking-tight">The agent&apos;s voice</h2>
+            <p className="mt-1 text-xs text-zinc-500">How the agent speaks when it dates on {first}&apos;s behalf.</p>
             <p className="relative mt-4 whitespace-pre-line border-l-2 border-rose-400/40 pl-4 text-sm leading-relaxed text-zinc-300">{a.agentPersona}</p>
           </section>
 
           <section className="card fade-up delay-3 p-6">
-            <h2 className="text-lg font-semibold tracking-tight">Raw sources the agent read</h2>
-            <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-              <div className="rounded-xl border border-sky-400/15 bg-sky-500/[0.06] p-4">
+            <h2 className="font-display text-xl font-medium tracking-tight">Raw sources the agent read</h2>
+            <div className="mt-4 grid gap-4 text-sm md:grid-cols-2">
+              <div className="min-w-0 rounded-xl border border-sky-400/15 bg-sky-500/[0.06] p-4">
                 <h3 className="mb-2 font-semibold text-sky-200">in · LinkedIn</h3>
                 {person.linkedin.summary && <p className="line-clamp-6 text-zinc-400">{person.linkedin.summary}</p>}
                 <ul className="mt-3 space-y-1 text-zinc-300">
                   {person.linkedin.experiences.slice(0, 5).map((e, i) => (
-                    <li key={i} className="truncate">• {e.title} {e.company ? <span className="text-zinc-500">@ {e.company}</span> : ""}</li>
+                    <li key={i} className="truncate">
+                      • {e.title} {e.company ? <span className="text-zinc-500">@ {e.company}</span> : ""}
+                    </li>
                   ))}
                   {person.linkedin.educations.slice(0, 2).map((e, i) => (
-                    <li key={`e${i}`} className="truncate">• {e.school} <span className="text-zinc-500">{e.degree ?? ""}</span></li>
+                    <li key={`e${i}`} className="truncate">
+                      • {e.school} <span className="text-zinc-500">{e.degree ?? ""}</span>
+                    </li>
                   ))}
                 </ul>
                 {person.linkedin.skills.length > 0 && <p className="mt-3 text-xs text-zinc-500">Skills: {person.linkedin.skills.slice(0, 12).join(", ")}</p>}
               </div>
-              <div className="rounded-xl border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-4">
+              <div className="min-w-0 rounded-xl border border-fuchsia-400/15 bg-fuchsia-500/[0.06] p-4">
                 <h3 className="mb-2 font-semibold text-fuchsia-200">◎ · Instagram @{person.instagram.username}</h3>
                 {person.instagram.biography && <p className="whitespace-pre-line text-zinc-400">{person.instagram.biography}</p>}
                 <ul className="mt-3 space-y-1.5 text-zinc-300">
                   {person.instagram.posts.slice(0, 5).map((p, i) => (
-                    <li key={i} className="line-clamp-2">• {p.caption}</li>
+                    <li key={i} className="line-clamp-2">
+                      • {p.caption}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -150,12 +185,13 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           </section>
         </div>
 
-        {/* Ranking + dates */}
-        <div className="space-y-6">
+        <aside className="min-w-0 space-y-6 xl:sticky xl:top-24 xl:self-start">
           <section className="card fade-up delay-1 p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold tracking-tight">Best fits for {first}</h2>
-              <Link href="/rankings" className="text-xs text-rose-300 hover:underline">all rankings</Link>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-display text-xl font-medium tracking-tight">Best fits for {first}</h2>
+              <Link href="/rankings" className="shrink-0 text-xs text-rose-300 hover:underline">
+                all rankings
+              </Link>
             </div>
             <div className="mt-3">
               <RankingList entries={ranking} selfId={person.id} limit={8} />
@@ -163,7 +199,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           </section>
 
           <section className="card fade-up delay-2 p-6">
-            <h2 className="text-lg font-semibold tracking-tight">Dates so far</h2>
+            <h2 className="font-display text-xl font-medium tracking-tight">Dates so far</h2>
             {myDates.length === 0 ? (
               <p className="mt-2 text-sm text-zinc-500">No dates yet. Pick someone above.</p>
             ) : (
@@ -181,7 +217,10 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                           <div className="truncate text-xs text-zinc-500">{d.venue}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm font-bold tabular-nums">{mine.score}<span className="text-xs font-normal text-zinc-500">/10</span></div>
+                          <div className="text-sm font-bold tabular-nums">
+                            {mine.score}
+                            <span className="text-xs font-normal text-zinc-500">/10</span>
+                          </div>
                           <div className={`text-[10px] ${mine.wouldSeeAgain ? "text-emerald-300" : "text-zinc-500"}`}>{mine.wouldSeeAgain ? "see again" : "pass"}</div>
                         </div>
                       </Link>
@@ -191,7 +230,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
               </ul>
             )}
           </section>
-        </div>
+        </aside>
       </div>
     </div>
   );
