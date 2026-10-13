@@ -49,7 +49,11 @@ export async function POST(req: NextRequest) {
           (step: ProgressStep, detail?: string) => send({ step, detail }),
           { force: !!force }
         );
-        await savePerson(person);
+        try {
+          await savePerson(person);
+        } catch (err) {
+          console.error("savePerson failed", err);
+        }
         send({ done: true, person });
       } catch (e) {
         send({ error: e instanceof Error ? e.message : String(e) });

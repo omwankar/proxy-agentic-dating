@@ -2,11 +2,12 @@ import { NextRequest } from "next/server";
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
+import { imageCacheDir } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const CACHE_DIR = path.join(process.cwd(), "data", "img");
+const CACHE_DIR = imageCacheDir();
 
 /** GET /api/img?u=<remote url> — proxies and caches profile photos (IG/LI CDNs block hotlinking and expire). */
 export async function GET(req: NextRequest) {
@@ -28,8 +29,12 @@ export async function GET(req: NextRequest) {
     if (!res.ok) return new Response("upstream " + res.status, { status: 502 });
     const type = res.headers.get("content-type") ?? "image/jpeg";
     const buf = Buffer.from(await res.arrayBuffer());
-    await fs.mkdir(CACHE_DIR, { recursive: true });
-    await Promise.all([fs.writeFile(file, buf), fs.writeFile(file + ".type", type)]);
+    try {
+      await fs.mkdir(CACHE_DIR, { recursive: true });
+      await Promise.all([fs.writeFile(file, buf), fs.writeFile(file + ".type", type)]);
+    } catch {
+      /* cache is optional; still return the photo */
+    }
     return new Response(buf, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=604800" } });
   } catch {
     return new Response("fetch failed", { status: 502 });

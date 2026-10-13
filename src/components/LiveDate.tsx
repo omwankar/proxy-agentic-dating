@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import type { Debrief, Turn } from "@/lib/types";
+import type { Debrief, Person, Turn } from "@/lib/types";
 import { Avatar } from "./Avatar";
 import { Bubble, Typing } from "./Transcript";
 import { DebriefCard } from "./DebriefCard";
@@ -19,6 +19,7 @@ export function LiveDate({ options }: { options: Option[] }) {
 
   const [aSel, setASel] = useState(aParam || options[0]?.id || "");
   const [bSel, setBSel] = useState(bParam || options[1]?.id || "");
+  const [remembered, setRemembered] = useState<Option[]>([]);
 
   const [status, setStatus] = useState<"idle" | "connecting" | "dating" | "debrief" | "done" | "error">("idle");
   const [venue, setVenue] = useState("");
@@ -30,17 +31,46 @@ export function LiveDate({ options }: { options: Option[] }) {
   const [result, setResult] = useState<{ id: string; mutualScore: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const esRef = useRef<EventSource | null>(null);
+  const esRef = useRef<{ close: () => void } | null>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [turns, debriefA, debriefB, result]);
 
   useEffect(() => {
+    const extras: Option[] = [];
+    for (const id of [aParam, bParam]) {
+      if (!id || options.some((o) => o.id === id)) continue;
+      try {
+        const raw = sessionStorage.getItem(`proxy-person:${id}`);
+        if (!raw) continue;
+        const p = JSON.parse(raw) as Person;
+        extras.push({ id: p.id, name: p.name, headline: p.headline, photo: p.photo });
+      } catch {
+        /* ignore a bad cache entry */
+      }
+    }
+    setRemembered(extras);
+  }, [aParam, bParam, options]);
+
+  useEffect(() => {
     if (aParam && bParam && aParam !== bParam) start(aParam, bParam);
     return () => esRef.current?.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aParam, bParam]);
+
+  function rememberedPeople(ids: string[]): Person[] {
+    const out: Person[] = [];
+    for (const id of ids) {
+      try {
+        const raw = sessionStorage.getItem(`proxy-person:${id}`);
+        if (raw) out.push(JSON.parse(raw) as Person);
+      } catch {
+        /* skip */
+      }
+    }
+    return out;
+  }
 
   function start(aId: string, bId: string) {
     esRef.current?.close();
@@ -52,7 +82,10 @@ export function LiveDate({ options }: { options: Option[] }) {
     setError(null);
     setA(null);
     setB(null);
-    const es = new EventSource(`/api/dates/stream?a=${encodeURIComponent(aId)}&b=${encodeURIComponent(bId)}`);
+    const extra = rememberedPeople([aId, bId]);
+    const es = extra.length
+      ? new FetchEventSource("/api/dates/stream", { a: aId, b: bId, extra })
+      : new EventSource(`/api/dates/stream?a=${encodeURIComponent(aId)}&b=${encodeURIComponent(bId)}`);
     esRef.current = es;
     es.addEventListener("start", (ev) => {
       const d = JSON.parse((ev as MessageEvent).data);
@@ -100,8 +133,9 @@ export function LiveDate({ options }: { options: Option[] }) {
   const lastSpeaker = turns[turns.length - 1]?.speakerId;
   const nextIsA = !lastSpeaker || lastSpeaker === b?.id;
   const inProgress = status === "dating" || status === "connecting";
-  const optA = options.find((o) => o.id === aSel);
-  const optB = options.find((o) => o.id === bSel);
+  const allOptions = [...options, ...remembered.filter((r) => !options.some((o) => o.id === r.id))];
+  const optA = allOptions.find((o) => o.id === aSel);
+  const optB = allOptions.find((o) => o.id === bSel);
 
   return (
     <div className="space-y-6">
@@ -109,13 +143,13 @@ export function LiveDate({ options }: { options: Option[] }) {
       <section className="card fade-up relative overflow-hidden p-5">
         <div className="pointer-events-none absolute left-1/2 top-0 h-40 w-80 -translate-x-1/2 rounded-full bg-rose-500/15 blur-3xl" />
         <div className="relative grid items-end gap-4 md:grid-cols-[1fr_auto_1fr_auto]">
-          <PickerSide label="Agent for" value={aSel} onChange={setASel} options={options} pick={optA} />
+          <PickerSide label="Agent for" value={aSel} onChange={setASel} options={allOptions} pick={optA} />
           <div className="hidden pb-3 text-center md:block">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-rose-300">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 21s-7.5-4.6-9.5-9A5.5 5.5 0 0 1 12 6.3 5.5 5.5 0 0 1 21.5 12c-2 4.4-9.5 9-9.5 9z" /></svg>
             </span>
           </div>
-          <PickerSide label="Agent for" value={bSel} onChange={setBSel} options={options} pick={optB} />
+          <PickerSide label="Agent for" value={bSel} onChange={setBSel} options={allOptions} pick={optB} />
           <button onClick={go} disabled={!aSel || !bSel || aSel === bSel || inProgress} className="btn-primary h-[46px]">
             {inProgress ? "Date in progress…" : "Start the date"}
           </button>
@@ -205,6 +239,65 @@ export function LiveDate({ options }: { options: Option[] }) {
       )}
     </div>
   );
+}
+
+/** EventSource is GET-only. This posts the just-built person, then reads the same SSE frames. */
+class FetchEventSource {
+  private closed = false;
+  private listeners = new Map<string, (ev: MessageEvent) => void>();
+  readyState = 0;
+  constructor(url: string, body: unknown) {
+    void this.run(url, body);
+  }
+  addEventListener(type: string, fn: (ev: MessageEvent) => void) {
+    this.listeners.set(type, fn);
+  }
+  close() {
+    this.closed = true;
+    this.readyState = 2;
+  }
+  private emit(type: string, data: string) {
+    this.listeners.get(type)?.({ data } as MessageEvent);
+  }
+  private async run(url: string, body: unknown) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok || !res.body) {
+        this.emit("error", JSON.stringify({ message: (await res.text()) || `Request failed (${res.status})` }));
+        return;
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        if (this.closed) {
+          await reader.cancel();
+          return;
+        }
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let sep;
+        while ((sep = buf.indexOf("\n\n")) >= 0) {
+          const block = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+          let event = "message";
+          const data: string[] = [];
+          for (const line of block.split("\n")) {
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) data.push(line.slice(5).trim());
+          }
+          if (data.length) this.emit(event, data.join("\n"));
+        }
+      }
+    } catch (err) {
+      if (!this.closed) this.emit("error", JSON.stringify({ message: err instanceof Error ? err.message : String(err) }));
+    }
+  }
 }
 
 function PickerSide({ label, value, onChange, options, pick }: { label: string; value: string; onChange: (v: string) => void; options: Option[]; pick?: Option }) {

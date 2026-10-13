@@ -2,8 +2,21 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { DateRecord, Person, PreScore } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const RAW_DIR = path.join(DATA_DIR, "raw");
+/** Seed JSON shipped with the deployment. Readable on Vercel, not writable. */
+const BUNDLED_DIR = path.join(process.cwd(), "data");
+/**
+ * Vercel lambdas can only create files under /tmp. Locally this is the same
+ * folder as the seed data, so `npm run dev` keeps writing data/*.json.
+ */
+const WRITABLE_DIR = process.env.VERCEL ? path.join("/tmp", "proxy-data") : BUNDLED_DIR;
+const RAW_DIR = path.join(WRITABLE_DIR, "raw");
+
+/** Same-request cache so a scrape still finishes if the disk write fails. */
+const memoryRaw = new Map<string, unknown>();
+
+export function imageCacheDir() {
+  return path.join(WRITABLE_DIR, "img");
+}
 
 async function ensureDirs() {
   await fs.mkdir(RAW_DIR, { recursive: true });
@@ -25,18 +38,28 @@ async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-async function readJson<T>(file: string, fallback: T): Promise<T> {
+async function readFileJson<T>(file: string): Promise<T | undefined> {
   try {
-    const txt = await fs.readFile(path.join(DATA_DIR, file), "utf8");
+    const txt = await fs.readFile(file, "utf8");
     return JSON.parse(txt) as T;
   } catch {
-    return fallback;
+    return undefined;
   }
+}
+
+async function readJson<T>(file: string, fallback: T): Promise<T> {
+  // On Vercel, anything added in this instance lives under /tmp. Otherwise read the bundled seed.
+  if (WRITABLE_DIR !== BUNDLED_DIR) {
+    const overlay = await readFileJson<T>(path.join(WRITABLE_DIR, file));
+    if (overlay !== undefined) return overlay;
+  }
+  const bundled = await readFileJson<T>(path.join(BUNDLED_DIR, file));
+  return bundled ?? fallback;
 }
 
 async function writeJson(file: string, value: unknown) {
   await ensureDirs();
-  const full = path.join(DATA_DIR, file);
+  const full = path.join(WRITABLE_DIR, file);
   const tmp = full + ".tmp";
   const body = JSON.stringify(value, null, 2);
   await fs.writeFile(tmp, body, "utf8");
@@ -81,17 +104,20 @@ export async function deletePerson(id: string): Promise<void> {
 
 // ---------- Raw scrape cache ----------
 export async function getRaw<T>(key: string): Promise<T | undefined> {
-  try {
-    const txt = await fs.readFile(path.join(RAW_DIR, `${key}.json`), "utf8");
-    return JSON.parse(txt) as T;
-  } catch {
-    return undefined;
-  }
+  if (memoryRaw.has(key)) return memoryRaw.get(key) as T;
+  const writable = await readFileJson<T>(path.join(RAW_DIR, `${key}.json`));
+  if (writable !== undefined) return writable;
+  return readFileJson<T>(path.join(BUNDLED_DIR, "raw", `${key}.json`));
 }
 
 export async function saveRaw(key: string, value: unknown): Promise<void> {
-  await ensureDirs();
-  await fs.writeFile(path.join(RAW_DIR, `${key}.json`), JSON.stringify(value, null, 2), "utf8");
+  memoryRaw.set(key, value);
+  try {
+    await ensureDirs();
+    await fs.writeFile(path.join(RAW_DIR, `${key}.json`), JSON.stringify(value), "utf8");
+  } catch (err) {
+    console.error("raw cache write skipped", err);
+  }
 }
 
 // ---------- Dates ----------

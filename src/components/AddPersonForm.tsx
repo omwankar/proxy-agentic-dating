@@ -55,6 +55,11 @@ export function AddPersonForm() {
             if (msg.detail) setDetails((d) => ({ ...d, [msg.step]: msg.detail }));
           }
           if (msg.done && msg.person) {
+            try {
+              sessionStorage.setItem(`proxy-person:${msg.person.id}`, JSON.stringify(msg.person));
+            } catch {
+              /* profile still opens if the server saved it */
+            }
             router.push(`/people/${msg.person.id}`);
             return;
           }
