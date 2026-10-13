@@ -183,6 +183,41 @@ function linkedInLooksValid(item: Any | undefined): item is Any {
   return Boolean(item.firstName || item.fullName || item.headline || item.about);
 }
 
+/** Actor errors come back as { originalQuery: { query }, error } instead of a flat profile. */
+function linkedInQueryText(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return linkedInQueryText(value[0]);
+  if (value && typeof value === "object") {
+    const o = value as Any;
+    return str(o.query) ?? str(o.url) ?? str(o.linkedinUrl) ?? linkedInQueryText(o.originalQuery);
+  }
+  return undefined;
+}
+
+function unwrapLinkedIn(it: Any): Any {
+  const el = it.element;
+  if (el && typeof el === "object" && !Array.isArray(el)) {
+    const profile = el as Any;
+    if (profile.firstName || profile.fullName || profile.headline || profile.publicIdentifier) {
+      return { ...profile, originalQuery: it.originalQuery ?? profile.originalQuery, query: it.query ?? profile.query };
+    }
+  }
+  return it;
+}
+
+function linkedInMatchKeys(it: Any): string[] {
+  const raw = [
+    str(it.publicIdentifier),
+    str(it.username),
+    linkedInQueryText(it.linkedinUrl),
+    linkedInQueryText(it.liUrl),
+    linkedInQueryText(it.query),
+    linkedInQueryText(it.originalQuery),
+    linkedInQueryText(it.inputUrl),
+  ];
+  return [...new Set(raw.filter(Boolean).map((u) => parseLinkedInUsername(u!).toLowerCase()).filter((u) => u && !u.startsWith("http")))];
+}
+
 export async function scrapeLinkedIn(usernameOrUrl: string, opts: { force?: boolean } = {}): Promise<LinkedInData> {
   const username = parseLinkedInUsername(usernameOrUrl);
   const cacheKey = `li_${username.toLowerCase()}`;
@@ -224,20 +259,21 @@ export async function scrapeLinkedInBatch(usernamesOrUrls: string[], opts: { for
     items.push(...(page.items as Any[]));
   }
   const byName = new Map<string, Any>();
-  for (const it of items) {
-    const keys = [str(it.publicIdentifier), parseLinkedInUsername(str(it.linkedinUrl) ?? ""), parseLinkedInUsername(str(it.query) ?? ""), parseLinkedInUsername(str(it.originalQuery) ?? "")]
-      .filter(Boolean)
-      .map((u) => u!.toLowerCase());
-    for (const u of keys) byName.set(u, it);
+  const unwrapped = items.map(unwrapLinkedIn);
+  for (const it of unwrapped) {
+    for (const u of linkedInMatchKeys(it)) byName.set(u, it);
   }
   if (items.length && byName.size === 0) {
     console.log("  LinkedIn items came back with unexpected keys:", Object.keys(items[0]).slice(0, 12).join(", "));
   }
   for (const u of todo) {
-    const item = byName.get(u);
+    const item = byName.get(u) ?? (todo.length === 1 && unwrapped.length === 1 ? unwrapped[0] : undefined);
     if (!linkedInLooksValid(item)) {
       const why = item as Any | undefined;
-      failed[u] = String(why?.error ?? why?.message ?? "not returned");
+      const detail = str(why?.error) ?? str(why?.message);
+      failed[u] = detail
+        ? `${detail}. Copy the link from the profile address bar — the slug after /in/ has to match.`
+        : "not returned";
     } else {
       await saveRaw(`li_${u}`, item);
       ok.push(u);
