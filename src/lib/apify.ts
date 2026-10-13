@@ -236,7 +236,8 @@ export async function scrapeLinkedInBatch(usernamesOrUrls: string[], opts: { for
   for (const u of todo) {
     const item = byName.get(u);
     if (!linkedInLooksValid(item)) {
-      failed[u] = String(item?.error ?? item?.message ?? "not returned");
+      const why = item as Any | undefined;
+      failed[u] = String(why?.error ?? why?.message ?? "not returned");
     } else {
       await saveRaw(`li_${u}`, item);
       ok.push(u);
