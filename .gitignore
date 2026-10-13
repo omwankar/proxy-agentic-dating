@@ -35,6 +35,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# cached profile photos (binary)
+/data/img
+# raw Apify scrapes — people.json already has the normalized sources
+/data/raw
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
