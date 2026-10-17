@@ -4,10 +4,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { Person } from "@/lib/types";
+import { photoSrc } from "@/lib/photo";
 
 export function PersonCard({ person }: { person: Person }) {
   const [failed, setFailed] = useState(false);
-  const src = person.photo ? `/api/img?u=${encodeURIComponent(person.photo)}` : "";
+  const src = photoSrc(person.photo);
   const initials = person.name
     .split(/\s+/)
     .slice(0, 2)

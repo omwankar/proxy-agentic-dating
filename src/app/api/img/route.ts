@@ -23,8 +23,13 @@ export async function GET(req: NextRequest) {
     /* miss */
   }
   try {
+    const referer = /instagram|fbcdn|cdninstagram/i.test(u) ? "https://www.instagram.com/" : "https://www.linkedin.com/";
     const res = await fetch(u, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36", Accept: "image/*" },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+        Accept: "image/*",
+        Referer: referer,
+      },
     });
     if (!res.ok) return new Response("upstream " + res.status, { status: 502 });
     const type = res.headers.get("content-type") ?? "image/jpeg";

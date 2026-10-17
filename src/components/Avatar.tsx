@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { photoSrc } from "@/lib/photo";
 
 export function Avatar({ src, name, size = 48, className = "" }: { src?: string; name: string; size?: number; className?: string }) {
   const [failed, setFailed] = useState(false);
@@ -23,7 +24,7 @@ export function Avatar({ src, name, size = 48, className = "" }: { src?: string;
   }
   return (
     <img
-      src={`/api/img?u=${encodeURIComponent(src)}`}
+      src={photoSrc(src)}
       alt={name}
       style={style}
       onError={() => setFailed(true)}
